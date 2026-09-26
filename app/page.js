@@ -4,10 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Plus, Search, Trash2, Tag, Heart } from 'lucide-react';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+const SUPABASE_URL = 'https://tptxwvggixjnvcqoxgmu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwdHh3dmdnaXhqbnZjcW94Z211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NTE1MjYsImV4cCI6MjEwNjAyNzUyNn0.f04IFwag5I4mwljFDP2qBAOHNW2uMuxMm4MzumzfL4g';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function NotesApp() {
   const [notes, setNotes] = useState([]);
@@ -80,7 +80,6 @@ export default function NotesApp() {
     setActiveNote(remainingNotes.length > 0 ? remainingNotes[0] : null);
   }
 
-  // Block-Verwaltung
   function updateBlock(index, key, val) {
     const newBlocks = [...(activeNote.content || [])];
     newBlocks[index] = { ...newBlocks[index], [key]: val };
@@ -98,7 +97,6 @@ export default function NotesApp() {
     saveActiveNote({ content: newBlocks });
   }
 
-  // Tag-Verwaltung
   function handleAddTag(e) {
     if (e.key === 'Enter' && tagInput.trim() !== '') {
       e.preventDefault();
@@ -124,7 +122,6 @@ export default function NotesApp() {
 
   return (
     <div className="app-container">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-title">
@@ -161,7 +158,6 @@ export default function NotesApp() {
         </div>
       </aside>
 
-      {/* Editor-Bereich */}
       <main className="main-content">
         {activeNote ? (
           <>
@@ -183,7 +179,6 @@ export default function NotesApp() {
                 </button>
               </div>
 
-              {/* Tags */}
               <div className="tags-bar">
                 <Tag size={16} color="#db2777" />
                 {(activeNote.tags || []).map((tag, idx) => (
@@ -208,7 +203,6 @@ export default function NotesApp() {
               </div>
             </div>
 
-            {/* Blöcke */}
             <div className="blocks-container">
               {(activeNote.content || []).map((block, index) => (
                 <div key={block.id || index} className="block-row">
