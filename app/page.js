@@ -2,38 +2,40 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Plus, Search, Trash2, Tag, Heart } from 'lucide-react';
+import { Plus, Trash2, Tag, Heart } from 'lucide-react';
 
-const SUPABASE_URL = 'https://tptxwvggixjnvcqoxgmu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwdHh3dmdnaXhqbnZjcW94Z211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NTE1MjYsImV4cCI6MjEwNjAyNzUyNn0.f04IFwag5I4mwljFDP2qBAOHNW2uMuxMm4MzumzfL4g';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const URL = 'https://tptxwvggixjnvcqoxgmu.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwdHh3dmdnaXhqbnZjcW94Z211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NTE1MjYsImV4cCI6MjEwNjAyNzUyNn0.f04IFwag5I4mwljFDP2qBAOHNW2uMuxMm4MzumzfL4g';
 
 export default function NotesApp() {
+  const [supabase, setSupabase] = useState(null);
   const [notes, setNotes] = useState([]);
   const [activeNote, setActiveNote] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [tagInput, setTagInput] = useState('');
 
+  // Initialisierung ausschließlich im Browser
   useEffect(() => {
-    loadNotes();
-  }, []);
+    const client = createClient(URL, KEY);
+    setSupabase(client);
 
-  async function loadNotes() {
-    const { data, error } = await supabase
-      .from('notes')
-      .select('*')
-      .order('updated_at', { ascending: false });
+    async function loadInitialNotes() {
+      const { data, error } = await client
+        .from('notes')
+        .select('*')
+        .order('updated_at', { ascending: false });
 
-    if (!error && data) {
-      setNotes(data);
-      if (data.length > 0 && !activeNote) {
-        setActiveNote(data[0]);
+      if (!error && data) {
+        setNotes(data);
+        if (data.length > 0) setActiveNote(data[0]);
       }
     }
-  }
+
+    loadInitialNotes();
+  }, []);
 
   async function createNewNote() {
+    if (!supabase) return;
     const newNoteTemplate = {
       title: 'Neue Notiz 🎀',
       content: [{ id: Date.now().toString(), type: 'text', value: '' }],
@@ -52,7 +54,7 @@ export default function NotesApp() {
   }
 
   async function saveActiveNote(updatedFields) {
-    if (!activeNote) return;
+    if (!activeNote || !supabase) return;
 
     const updatedNote = { ...activeNote, ...updatedFields };
     setActiveNote(updatedNote);
@@ -72,7 +74,7 @@ export default function NotesApp() {
   }
 
   async function deleteActiveNote() {
-    if (!activeNote) return;
+    if (!activeNote || !supabase) return;
 
     await supabase.from('notes').delete().eq('id', activeNote.id);
     const remainingNotes = notes.filter((n) => n.id !== activeNote.id);
@@ -114,10 +116,10 @@ export default function NotesApp() {
   }
 
   const filteredNotes = notes.filter((note) => {
-    const matchesSearch =
+    return (
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (note.tags && note.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())));
-    return matchesSearch;
+      (note.tags && note.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())))
+    );
   });
 
   return (
