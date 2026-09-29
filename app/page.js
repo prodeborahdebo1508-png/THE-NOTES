@@ -14,7 +14,6 @@ export default function NotesApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [tagInput, setTagInput] = useState('');
 
-  // Initialisierung ausschließlich im Browser
   useEffect(() => {
     const client = createClient(URL, KEY);
     setSupabase(client);
@@ -34,11 +33,21 @@ export default function NotesApp() {
     loadInitialNotes();
   }, []);
 
+  // Textinhalt sicher auslesen (auch für bestehende alte Notizen)
+  function getNoteText(note) {
+    if (!note || !note.content) return '';
+    if (typeof note.content === 'string') return note.content;
+    if (Array.isArray(note.content)) {
+      return note.content.map((b) => b.value || '').join('\n');
+    }
+    return '';
+  }
+
   async function createNewNote() {
     if (!supabase) return;
     const newNoteTemplate = {
       title: 'Neue Notiz 🎀',
-      content: [{ id: Date.now().toString(), type: 'text', value: '' }],
+      content: '',
       tags: ['Alltag'],
     };
 
@@ -82,23 +91,6 @@ export default function NotesApp() {
     setActiveNote(remainingNotes.length > 0 ? remainingNotes[0] : null);
   }
 
-  function updateBlock(index, key, val) {
-    const newBlocks = [...(activeNote.content || [])];
-    newBlocks[index] = { ...newBlocks[index], [key]: val };
-    saveActiveNote({ content: newBlocks });
-  }
-
-  function addBlock(type = 'text') {
-    const newBlock = { id: Date.now().toString(), type, value: '' };
-    const newBlocks = [...(activeNote.content || []), newBlock];
-    saveActiveNote({ content: newBlocks });
-  }
-
-  function removeBlock(index) {
-    const newBlocks = activeNote.content.filter((_, i) => i !== index);
-    saveActiveNote({ content: newBlocks });
-  }
-
   function handleAddTag(e) {
     if (e.key === 'Enter' && tagInput.trim() !== '') {
       e.preventDefault();
@@ -116,14 +108,14 @@ export default function NotesApp() {
   }
 
   const filteredNotes = notes.filter((note) => {
-    return (
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (note.tags && note.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())))
-    );
+    const titleMatch = (note.title || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const tagMatch = note.tags && note.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    return titleMatch || tagMatch;
   });
 
   return (
     <div className="app-container">
+      {/* Linke Leiste */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-title">
@@ -160,7 +152,8 @@ export default function NotesApp() {
         </div>
       </aside>
 
-      <main className="main-content">
+      {/* Rechter Schreibbereich */}
+      <main className="main-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {activeNote ? (
           <>
             <div className="editor-header">
@@ -168,7 +161,7 @@ export default function NotesApp() {
                 <input
                   type="text"
                   className="title-input"
-                  value={activeNote.title}
+                  value={activeNote.title || ''}
                   onChange={(e) => saveActiveNote({ title: e.target.value })}
                   placeholder="Titel der Notiz..."
                 />
@@ -188,7 +181,7 @@ export default function NotesApp() {
                     #{tag}
                     <button
                       onClick={() => removeTag(tag)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#db2777' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#db2777', marginLeft: '4px' }}
                     >
                       ×
                     </button>
@@ -205,42 +198,25 @@ export default function NotesApp() {
               </div>
             </div>
 
-            <div className="blocks-container">
-              {(activeNote.content || []).map((block, index) => (
-                <div key={block.id || index} className="block-row">
-                  <select
-                    className="block-select"
-                    value={block.type}
-                    onChange={(e) => updateBlock(index, 'type', e.target.value)}
-                  >
-                    <option value="text">Text</option>
-                    <option value="heading">Überschrift</option>
-                    <option value="bullet">Aufzählung</option>
-                  </select>
-
-                  <input
-                    type="text"
-                    className={`block-input ${block.type}`}
-                    value={block.value || ''}
-                    placeholder={
-                      block.type === 'heading'
-                        ? 'Überschrift...'
-                        : block.type === 'bullet'
-                        ? '• Listenpunkt...'
-                        : 'Text eingeben...'
-                    }
-                    onChange={(e) => updateBlock(index, 'value', e.target.value)}
-                  />
-
-                  <button className="btn-delete-block" onClick={() => removeBlock(index)}>
-                    ×
-                  </button>
-                </div>
-              ))}
-
-              <button className="btn-add-block" onClick={() => addBlock('text')}>
-                + Block hinzufügen
-              </button>
+            {/* Durchgehender Fließtext-Bereich */}
+            <div style={{ flex: 1, padding: '20px 30px', display: 'flex' }}>
+              <textarea
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  outline: 'none',
+                  resize: 'none',
+                  fontSize: '1.1rem',
+                  lineHeight: '1.7',
+                  fontFamily: 'inherit',
+                  color: '#374151',
+                  backgroundColor: 'transparent',
+                }}
+                value={getNoteText(activeNote)}
+                onChange={(e) => saveActiveNote({ content: e.target.value })}
+                placeholder="Schreiben Sie hier einfach drauf los... 🌸"
+              />
             </div>
           </>
         ) : (
