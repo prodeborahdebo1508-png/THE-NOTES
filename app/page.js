@@ -38,29 +38,22 @@ const DEFAULT_SCENE = {
   id: 'scene-init',
   title: 'Kapitel 1: Der Anfang 🌸',
   act: 'Akt I',
-  content: 'Die Straßenlaternen flackerten sanft im Abendlicht. Kitty blickte aus dem Fenster und dachte an das bevorstehende Abenteuer...',
+  content: '',
   status: 'writing',
   notes: '',
   order_index: 1,
-};
-
-const DEFAULT_CHAR = {
-  id: 'char-init',
-  name: 'Kitty',
-  role: 'Hauptfigur',
-  description: 'Protagonistin mit rosa Schleife.',
 };
 
 export default function NovelStudio() {
   const [supabase, setSupabase] = useState(null);
   const [scenes, setScenes] = useState([DEFAULT_SCENE]);
   const [activeScene, setActiveScene] = useState(DEFAULT_SCENE);
-  const [characters, setCharacters] = useState([DEFAULT_CHAR]);
-  const [selectedChar, setSelectedChar] = useState(DEFAULT_CHAR);
+  const [characters, setCharacters] = useState([]);
+  const [selectedChar, setSelectedChar] = useState(null);
   
   const [viewMode, setViewMode] = useState('write');
   const [newCharName, setNewCharName] = useState('');
-  const [renameTarget, setRenameTarget] = useState(DEFAULT_CHAR.name);
+  const [renameTarget, setRenameTarget] = useState('');
   const [renameNotice, setRenameNotice] = useState('');
   const [viewportHeight, setViewportHeight] = useState('100%');
 
@@ -91,6 +84,7 @@ export default function NovelStudio() {
     };
   }, []);
 
+  // Daten laden
   useEffect(() => {
     let client = null;
     try {
@@ -114,8 +108,8 @@ export default function NovelStudio() {
     if (localChars) {
       try {
         const parsed = JSON.parse(localChars);
+        setCharacters(parsed);
         if (parsed.length > 0) {
-          setCharacters(parsed);
           setSelectedChar(parsed[0]);
           setRenameTarget(parsed[0].name);
         }
@@ -134,10 +128,12 @@ export default function NovelStudio() {
 
       client.from('characters').select('*').order('created_at', { ascending: true })
         .then(({ data }) => {
-          if (data && data.length > 0) {
+          if (data) {
             setCharacters(data);
-            setSelectedChar(data[0]);
-            setRenameTarget(data[0].name);
+            if (data.length > 0) {
+              setSelectedChar(data[0]);
+              setRenameTarget(data[0].name);
+            }
             localStorage.setItem('novel_studio_chars', JSON.stringify(data));
           }
         });
@@ -170,6 +166,7 @@ export default function NovelStudio() {
     }
   }
 
+  // Szene anlegen
   async function createScene() {
     const tempId = 'scene-' + Date.now();
     const newScene = {
@@ -209,18 +206,23 @@ export default function NovelStudio() {
     }
   }
 
-  async function deleteCurrentScene() {
-    if (!activeScene) return;
-    const remaining = scenes.filter((s) => s.id !== activeScene.id);
+  // Szene gezielt per ID löschen (aus linker Leiste)
+  async function deleteSceneById(sceneId, e) {
+    if (e) e.stopPropagation();
+    const remaining = scenes.filter((s) => s.id !== sceneId);
     setScenes(remaining);
-    setActiveScene(remaining.length > 0 ? remaining[0] : null);
+    
+    if (activeScene?.id === sceneId) {
+      setActiveScene(remaining.length > 0 ? remaining[0] : null);
+    }
     localStorage.setItem('novel_studio_scenes', JSON.stringify(remaining));
 
-    if (supabase && typeof activeScene.id === 'string' && !activeScene.id.startsWith('scene-')) {
-      supabase.from('scenes').delete().eq('id', activeScene.id).then();
+    if (supabase && typeof sceneId === 'string' && !sceneId.startsWith('scene-')) {
+      supabase.from('scenes').delete().eq('id', sceneId).then();
     }
   }
 
+  // Figur anlegen
   async function addCharacter() {
     if (!newCharName.trim()) return;
     const name = newCharName.trim();
@@ -257,6 +259,7 @@ export default function NovelStudio() {
     }
   }
 
+  // Figur gezielt per ID löschen (aus rechter Leiste)
   async function deleteCharacter(charId, e) {
     if (e) e.stopPropagation();
     const remaining = characters.filter((c) => c.id !== charId);
@@ -275,6 +278,7 @@ export default function NovelStudio() {
     }
   }
 
+  // Global umbenennen
   async function performGlobalRename() {
     if (!selectedChar || !renameTarget.trim()) return;
     const oldName = selectedChar.name;
@@ -333,7 +337,7 @@ export default function NovelStudio() {
 
   return (
     <div className="studio-container" style={{ height: viewportHeight }}>
-      {/* 1. Linke Spalte */}
+      {/* 1. Linke Spalte: Manuskript */}
       <aside className="sidebar-left">
         <div className="brand-header">
           <KittyMascot size={34} />
@@ -374,19 +378,37 @@ export default function NovelStudio() {
               key={scene.id}
               className={`scene-item ${activeScene?.id === scene.id ? 'active' : ''}`}
               onClick={() => { setActiveScene(scene); setViewMode('write'); }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}
             >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                 {scene.title || `Szene ${idx + 1}`}
               </span>
-              <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>
+              <span style={{ fontSize: '0.75rem', opacity: 0.6, flexShrink: 0 }}>
                 {(scene.content || '').trim().split(/\s+/).filter(Boolean).length} W.
               </span>
+              <button
+                type="button"
+                onClick={(e) => deleteSceneById(scene.id, e)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#f43f5e',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                }}
+                title="Szene löschen"
+              >
+                <Trash2 size={15} />
+              </button>
             </div>
           ))}
         </div>
       </aside>
 
-      {/* 2. Mittlerer Schreibbereich */}
+      {/* 2. Mittlere Spalte: Schreiben */}
       <main className="editor-center">
         <div className="editor-toolbar">
           <div className="view-toggle">
@@ -411,9 +433,9 @@ export default function NovelStudio() {
           {activeScene && (
             <button 
               type="button"
-              onClick={deleteCurrentScene}
+              onClick={(e) => deleteSceneById(activeScene.id, e)}
               style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '6px' }}
-              title="Szene löschen"
+              title="Aktuelle Szene löschen"
             >
               <Trash2 size={18} />
             </button>
@@ -471,7 +493,7 @@ export default function NovelStudio() {
         )}
       </main>
 
-      {/* 3. Rechte Spalte: Charakter-Zentrale */}
+      {/* 3. Rechte Spalte: Charaktere */}
       <aside className="sidebar-right">
         <div className="section-title">
           <Users size={18} />
@@ -510,13 +532,14 @@ export default function NovelStudio() {
                 style={{
                   border: selectedChar?.id === char.id ? '2px solid #ec4899' : '1px solid #fce7f3',
                   cursor: 'pointer',
+                  padding: '10px 12px',
                 }}
                 onClick={() => {
                   setSelectedChar(char);
                   setRenameTarget(char.name);
                 }}
               >
-                <div className="character-header">
+                <div className="character-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: '700', color: '#374151' }}>{char.name}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="badge-occurrences">
@@ -530,13 +553,13 @@ export default function NovelStudio() {
                         border: 'none',
                         color: '#f43f5e',
                         cursor: 'pointer',
-                        padding: '2px',
+                        padding: '4px',
                         display: 'flex',
                         alignItems: 'center',
                       }}
                       title="Charakter löschen"
                     >
-                      <Trash2 size={15} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
